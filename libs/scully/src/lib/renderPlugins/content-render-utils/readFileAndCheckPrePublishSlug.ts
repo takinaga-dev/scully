@@ -13,6 +13,7 @@ export interface ContentMetaData {
   'publish date'?: Date;
   slugs?: string[];
   title?: string;
+  secret?: boolean;
   [key: string]: any;
 }
 
@@ -20,8 +21,11 @@ export interface ContentMetaData {
 export async function readFileAndCheckPrePublishSlug(file) {
   const prependString = '___UNPUBLISHED___';
   const createSlug = () => `${prependString}${Date.now().toString(36)}_${randomString(32)}`;
+  const createSecret = () => `${Date.now().toString(36)}_${randomString(32)}`;
+  logWarn(`file path is "${file}"`);
   const originalFile = readFileSync(file, 'utf-8');
   const { attributes: meta, body: fileContent }: { attributes: ContentMetaData; body: string } = fm(originalFile);
+  logWarn(meta);
   let prePublished = false;
   if (fileContent.trim() === '') {
     logWarn(`Content file "${yellow(file)}" has no content!`);
@@ -51,6 +55,18 @@ export async function readFileAndCheckPrePublishSlug(file) {
     prePublished = true;
     /** overwrite slug from file with prepub only in memory. we don't want a file with the original slug name now. */
     meta.slug = unPublishedSlug;
+  }
+
+  // for secret
+  if (meta.hasOwnProperty('secret') && meta.secret === true) {
+    logWarn('add secret path');
+    const slugs = Array.isArray(meta.slugs) ? meta.slugs : [];
+    const secretPath = createSecret();
+    if (!slugs.length) {
+      updateFileWithNewMeta({ ...meta, slugs: slugs.concat(secretPath) });
+    }
+    prePublished = true;
+    meta.slug = secretPath;
   }
   return { meta, fileContent, prePublished };
 
